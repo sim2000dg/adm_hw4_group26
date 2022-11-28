@@ -19,11 +19,14 @@ def clean_time(time_data: pd.Series, timestamp: bool, old_dates: bool) -> pd.Ser
     time_data = time_data.copy()
     if not timestamp:
         if old_dates:
+            # DOB from 1800 considered as nan
             time_data[time_data == '1/1/1800'] = np.nan
+        # add 19 or 20 to dates in order to avoid problems in parsing the year
         time_data[~time_data.isna()] = \
             time_data[~time_data.isna()].str.replace(r'(?=\d{2}$)', '19' if old_dates else '20', regex=True)
         time_data = pd.to_datetime(time_data, errors='coerce', dayfirst=True)
     else:
+        # add 0 in order to avoid problems in parsing the hour
         time_data = pd.to_datetime(time_data.astype(str).str.zfill(6), format='%H%M%S')
     return time_data
 
@@ -34,7 +37,9 @@ def get_age(dob: pd.Series) -> pd.Series:
     :param dob: Series with the date of birth for each customer
     :return: Series with the age (int) for each customer
     """
+    # Get age through floor division
     age = (pd.Timestamp.now() - dob.fillna(dob.mean())) // np.timedelta64(1, 'Y')
+    # age greater than 100 comes from having wrongly added 19 in place of 20, reverse it
     age[age >= 100] = age[age >= 100] - 100
     return age
 
@@ -94,6 +99,7 @@ class Shingling:
     (SciPy) sparse shingle matrix, available as an attribute, while new transformation can be performed with
     the 'transform' method.
     """
+    # The init method is just the initialization of a sequence of KBinsDiscretizer and OneHotEncoder scikit objects
     def __init__(self, customers: pd.DataFrame) -> None:
         self.age_encoder = \
             sk_pre.KBinsDiscretizer(5, encode='onehot-dense', strategy='quantile',
@@ -132,6 +138,11 @@ class Shingling:
                                                                 one_hot_location]).T)
 
     def transform(self, customer_query: pd.DataFrame) -> sparse.csr_matrix:
+        """
+        Method to do the shingling transformation on query observations.
+        :param customer_query: A Pandas DataFrame with the query observations
+        :return: A shingle matrix representing the query observations.
+        """
         shingle_matrix_query = sparse.csr_matrix(np.concatenate([
             self.age_encoder.transform(np.expand_dims(customer_query.age, 1)),
             self.gender_encoder.transform(np.expand_dims(customer_query.CustGender, 1)),
