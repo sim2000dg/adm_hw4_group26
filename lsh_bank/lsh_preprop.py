@@ -34,6 +34,7 @@ def clean_time(time_data: pd.Series, timestamp: bool, old_dates: bool) -> pd.Ser
 def get_age(dob: pd.Series) -> pd.Series:
     """
     Function to get the age of a customer starting from its date of birth.
+
     :param dob: Series with the date of birth for each customer
     :return: Series with the age (int) for each customer
     """
@@ -78,9 +79,12 @@ def to_customers(transactions: pd.DataFrame, key: list[str, ...]) -> pd.DataFram
     # Apply different aggregation functions to different columns
     # Notice that to build the customer dataset we are considering the last recorded account balance
     customers = pd.concat([grouped.agg(dict([
-        ('CustLocation', lambda x: pd.Series.mode(x)[0]), ('TransactionTime', 'mean'),
+        ('CustLocation', lambda x: x.mode().iat[0] if np.sum(~x.isna()) else np.nan), ('TransactionTime', 'mean'),
         ('TransactionAmount (INR)', 'mean')])),
         transactions.loc[grouped.TransactionDate.idxmax()].set_index(key)['CustAccountBalance']], axis=1, copy=False)
+
+    # Impute NAs for Customer Location
+    customers.CustLocation.fillna(customers.CustLocation.mode().iat[0], inplace=True)
 
     # Get only the hour from Transaction Time after the aggregation mean
     customers.TransactionTime = customers.TransactionTime.dt.hour
@@ -96,8 +100,10 @@ class Shingling:
     """
     Class keeping the state of the shingling transformation. It holds the scikit object used to create the shingle
     matrix and needed to reproduce the transformation for new query observations. Initialization builds the
-    (SciPy) sparse shingle matrix, available as an attribute, while new transformation can be performed with
+    (SciPy) sparse shingle matrix from the customer data, while new transformation can be performed with
     the 'transform' method.
+
+    Constructor factory method works directly on the transaction data in order to build the object.
     """
     # The init method is just the initialization of a sequence of KBinsDiscretizer and OneHotEncoder scikit objects
     def __init__(self, customers: pd.DataFrame) -> None:
@@ -135,7 +141,7 @@ class Shingling:
 
         self.shingle_matrix = sparse.csr_matrix(np.concatenate([one_hot_age, one_hot_gender,
                                                                 one_hot_time_trans, one_hot_balance,
-                                                                one_hot_location]).T)
+                                                                one_hot_location], axis=1).T)
 
     def transform(self, customer_query: pd.DataFrame) -> sparse.csr_matrix:
         """
@@ -151,21 +157,44 @@ class Shingling:
             self.location_encoder.transform(np.expand_dims(customer_query.CustLocation, 1))]).T)
         return shingle_matrix_query
 
+    @classmethod
+    def constructor(cls, transaction_table):
+        """
+        Factory method to build an instance of Shingling from dirty transaction data.
+
+        :param transaction_table: Table with the information for each transaction.
+        :return: instance of the Shingling class.
+        """
+        # With deep copy the underlying Numpy array IS NOT copied
+        # Copying the object prevents side effects though
+        transaction_table = transaction_table.copy()
+        # Clean DOBs
+        transaction_table.CustomerDOB = clean_time(transaction_table.CustomerDOB, timestamp=False, old_dates=True)
+        # Clean Transaction Times
+        transaction_table.TransactionTime = clean_time(transaction_table.TransactionTime, timestamp=True,
+                                                       old_dates=False)
+        # Clean Transaction Dates
+        transaction_table.TransactionDate = clean_time(transaction_table.TransactionDate, timestamp=False,
+                                                       old_dates=False)
+        # Impute NAs in Balance
+        transaction_table.loc[transaction_table.CustAccountBalance.isna(), 'CustAccountBalance'] = \
+            transaction_table.CustAccountBalance.mean()
+        # Get customer data
+        customers = to_customers(transaction_table, key=['CustomerID', 'CustomerDOB', 'CustGender'])
+        # Get age from DOBs
+        customers['age'] = get_age(customers.CustomerDOB)
+        # Drop IDs from the original df
+        customers.drop('CustomerDOB', axis=1, inplace=True)
+        return cls(customers)
+
 
 # Test environ
 if __name__ == '__main__':
+    import sys
+    get_trace = sys.gettrace()
     dotenv.load_dotenv('../../ext_variables.env')
     file_path = os.path.join(os.getenv("PATH_FILES_ADM"), 'bank_transactions.csv')
-    transaction_table = pd.read_csv(file_path, index_col='TransactionID', nrows=1000)
-    transaction_table.CustomerDOB = clean_time(transaction_table.CustomerDOB, timestamp=False, old_dates=True)
-    transaction_table.TransactionTime = clean_time(transaction_table.TransactionTime, timestamp=True, old_dates=False)
-    transaction_table.TransactionDate = clean_time(transaction_table.TransactionDate, timestamp=False, old_dates=False)
-    transaction_table.loc[transaction_table.CustAccountBalance.isna(), 'CustAccountBalance'] = \
-        transaction_table.CustAccountBalance.mean()
-    test_to_custom = to_customers(transaction_table, key=['CustomerID', 'CustomerDOB', 'CustGender'])
-    test_to_custom['age'] = get_age(test_to_custom.CustomerDOB)
-    test_to_custom.drop('CustomerDOB', axis=1, inplace=True)
-    shingl_obj = Shingling(test_to_custom)
-    print(shingl_obj.shingle_matrix.shape)
+    trans_table = pd.read_csv(file_path, index_col='TransactionID', nrows=10000 if get_trace else 1048567)
+    test = Shingling.constructor(trans_table)
 
 
