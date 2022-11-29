@@ -107,6 +107,7 @@ class Shingling:
     """
     # The init method is just the initialization of a sequence of KBinsDiscretizer and OneHotEncoder scikit objects
     def __init__(self, customers: pd.DataFrame) -> None:
+        # Age
         self.age_encoder = \
             sk_pre.KBinsDiscretizer(5, encode='onehot-dense', strategy='quantile',
                                     subsample=200000).fit(np.expand_dims(customers.age, 1))
@@ -140,7 +141,7 @@ class Shingling:
         one_hot_location = self.location_encoder.transform(np.expand_dims(customers.CustLocation, 1))
 
         self.shingle_matrix = sparse.csr_matrix(np.concatenate([one_hot_age, one_hot_gender,
-                                                                one_hot_time_trans, one_hot_balance,
+                                                                one_hot_time_trans, one_hot_amount, one_hot_balance,
                                                                 one_hot_location], axis=1).T)
 
     def transform(self, customer_query: pd.DataFrame) -> sparse.csr_matrix:
@@ -153,6 +154,7 @@ class Shingling:
             self.age_encoder.transform(np.expand_dims(customer_query.age, 1)),
             self.gender_encoder.transform(np.expand_dims(customer_query.CustGender, 1)),
             self.time_trans_encoder.transform(np.expand_dims(customer_query.TransactionTime, 1)),
+            self.trans_amount_encoder.transform(np.expand_dims(customer_query['TransactionAmount (INR)'], 1)),
             self.account_balance_encoder.transform(np.expand_dims(customer_query.CustAccountBalance, 1)),
             self.location_encoder.transform(np.expand_dims(customer_query.CustLocation, 1))]).T)
         return shingle_matrix_query
@@ -196,5 +198,6 @@ if __name__ == '__main__':
     file_path = os.path.join(os.getenv("PATH_FILES_ADM"), 'bank_transactions.csv')
     trans_table = pd.read_csv(file_path, index_col='TransactionID', nrows=10000 if get_trace else 1048567)
     test = Shingling.constructor(trans_table)
+    print(test.shingle_matrix.shape)
 
 
