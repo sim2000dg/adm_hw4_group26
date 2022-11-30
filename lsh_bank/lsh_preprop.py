@@ -3,8 +3,6 @@ from numpy import dtype
 import numpy as np
 import scipy.sparse as sparse
 import sklearn.preprocessing as sk_pre
-import dotenv
-import os
 
 
 def clean_time(time_data: pd.Series, timestamp: bool, old_dates: bool) -> pd.Series:
@@ -100,7 +98,7 @@ class Shingling:
     """
     Class keeping the state of the shingling transformation. It holds the scikit object used to create the shingle
     matrix and needed to reproduce the transformation for new query observations. Initialization builds the
-    (SciPy) sparse shingle matrix from the customer data, while new transformation can be performed with
+    (SciPy) sparse shingle matrix from the customer data, while new transformations can be performed with
     the 'transform' method.
 
     Constructor factory method works directly on the transaction data in order to build the object.
@@ -193,11 +191,15 @@ class Shingling:
 # Test environ
 if __name__ == '__main__':
     import sys
-    get_trace = sys.gettrace()
+    import os
+    import dotenv
+    import pickle
     dotenv.load_dotenv('../../ext_variables.env')
+    get_trace = sys.gettrace()
     file_path = os.path.join(os.getenv("PATH_FILES_ADM"), 'bank_transactions.csv')
     trans_table = pd.read_csv(file_path, index_col='TransactionID', nrows=10000 if get_trace else 1048567)
-    test = Shingling.constructor(trans_table)
-    print(test.shingle_matrix.shape)
+    shingling_obj = Shingling.constructor(trans_table)
+    with open(os.path.join(os.getenv("PATH_FILES_ADM"), 'shingling_obj.pickle'), 'wb') as file:
+        pickle.dump(shingling_obj, file)
 
 
