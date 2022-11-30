@@ -154,7 +154,7 @@ class Shingling:
             self.time_trans_encoder.transform(np.expand_dims(customer_query.TransactionTime, 1)),
             self.trans_amount_encoder.transform(np.expand_dims(customer_query['TransactionAmount (INR)'], 1)),
             self.account_balance_encoder.transform(np.expand_dims(customer_query.CustAccountBalance, 1)),
-            self.location_encoder.transform(np.expand_dims(customer_query.CustLocation, 1))]).T)
+            self.location_encoder.transform(np.expand_dims(customer_query.CustLocation, 1))], axis=1).T)
         return shingle_matrix_query
 
     @classmethod
