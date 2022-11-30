@@ -158,7 +158,7 @@ class Shingling:
         return shingle_matrix_query
 
     @classmethod
-    def constructor(cls, transaction_table):
+    def constructor(cls, transaction_table: pd.DataFrame) -> "Shingling":
         """
         Factory method to build an instance of Shingling from dirty transaction data.
 
