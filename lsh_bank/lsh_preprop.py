@@ -103,8 +103,11 @@ class Shingling:
 
     Constructor factory method works directly on the transaction data in order to build the object.
     """
+
     # The init method is just the initialization of a sequence of KBinsDiscretizer and OneHotEncoder scikit objects
     def __init__(self, customers: pd.DataFrame) -> None:
+        self.consumer_table = customers  # Save customer table to return results for the query
+
         # Age
         self.age_encoder = \
             sk_pre.KBinsDiscretizer(5, encode='onehot-dense', strategy='quantile',
@@ -134,8 +137,9 @@ class Shingling:
         one_hot_balance = self.account_balance_encoder.transform(np.expand_dims(customers.CustAccountBalance, 1))
 
         # Common Customer Location
-        self.location_encoder = sk_pre.OneHotEncoder(sparse=False, max_categories=10).fit(
-            np.expand_dims(customers.CustLocation, 1))
+        self.location_encoder = sk_pre.OneHotEncoder(sparse=False, max_categories=10,
+                                                     handle_unknown='infrequent_if_exist')\
+            .fit(np.expand_dims(customers.CustLocation, 1))
         one_hot_location = self.location_encoder.transform(np.expand_dims(customers.CustLocation, 1))
 
         self.shingle_matrix = sparse.csr_matrix(np.concatenate([one_hot_age, one_hot_gender,
@@ -148,6 +152,18 @@ class Shingling:
         :param customer_query: A Pandas DataFrame with the query observations
         :return: A shingle matrix representing the query observations.
         """
+        customer_query = customer_query.copy()
+        # Clean DOBs
+        customer_query.CustomerDOB = clean_time(customer_query.CustomerDOB, timestamp=False, old_dates=True)
+        # Clean transaction times
+        customer_query.TransactionTime = clean_time(customer_query.TransactionTime, timestamp=True,
+                                                    old_dates=False)
+        # Clean transaction dates
+        customer_query.TransactionDate = clean_time(customer_query.TransactionDate, timestamp=False,
+                                                    old_dates=False)
+        # Get age from DoB
+        customer_query['age'] = get_age(customer_query.CustomerDOB)
+
         shingle_matrix_query = sparse.csr_matrix(np.concatenate([
             self.age_encoder.transform(np.expand_dims(customer_query.age, 1)),
             self.gender_encoder.transform(np.expand_dims(customer_query.CustGender, 1)),
@@ -185,6 +201,7 @@ class Shingling:
         customers['age'] = get_age(customers.CustomerDOB)
         # Drop IDs from the original df
         customers.drop('CustomerDOB', axis=1, inplace=True)
+
         return cls(customers)
 
 
@@ -194,6 +211,7 @@ if __name__ == '__main__':
     import os
     import dotenv
     import pickle
+
     dotenv.load_dotenv('../../ext_variables.env')
     get_trace = sys.gettrace()
     file_path = os.path.join(os.getenv("PATH_FILES_ADM"), 'bank_transactions.csv')
@@ -201,5 +219,3 @@ if __name__ == '__main__':
     shingling_obj = Shingling.constructor(trans_table)
     with open(os.path.join(os.getenv("PATH_FILES_ADM"), 'shingling_obj.pickle'), 'wb') as file:
         pickle.dump(shingling_obj, file)
-
-
