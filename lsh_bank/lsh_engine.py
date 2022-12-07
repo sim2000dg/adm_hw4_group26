@@ -74,10 +74,9 @@ def lsh(minhash_signatures_dataset: np.array, minhash_signature_query: np.array,
     collapsed_query = minhash_signature_query.reshape(-1, 1, n_bands)
 
     # Use broadcasting
-    matches = np.all(collapsed_signatures_dataset == collapsed_query, axis=2).sum(axis=0)
-    print(len(np.nonzero(matches)[0]))
+    matches = np.all(collapsed_signatures_dataset == collapsed_query, axis=0).sum(axis=1)
     similar = customers_dataset.assign(matches=matches)
-    similar = similar[similar.matches != 0]
+    similar = similar[similar.matches > 1]
 
     return similar
 
@@ -100,9 +99,7 @@ if __name__ == '__main__':
     query_array_transformed = shingling_obj.transform(query_array)
     query_array_signatures = min_hashing(shuffling_obj, query_array_transformed)
     for query in query_array_signatures.T:
-        test = lsh(signatures_array, query, shingling_obj.consumer_table, 2)
-        print(test)
-        break
+        test = lsh(signatures_array, query, shingling_obj.consumer_table, 200)
 
 
 
