@@ -75,7 +75,7 @@ def to_customers(transactions: pd.DataFrame, key: list[str, ...]) -> pd.DataFram
     grouped = transactions.groupby(key)
 
     # Apply different aggregation functions to different columns
-    # Notice that to build the customer dataset we are considering the last recorded account balance
+    # Notice that to build the customer dataset we are considering the most recently recoded account balance
     customers = pd.concat([grouped.agg(dict([
         ('CustLocation', lambda x: x.mode().iat[0] if np.sum(~x.isna()) else np.nan), ('TransactionTime', 'mean'),
         ('TransactionAmount (INR)', 'mean')])),
@@ -106,11 +106,11 @@ class Shingling:
 
     # The init method is just the initialization of a sequence of KBinsDiscretizer and OneHotEncoder scikit objects
     def __init__(self, customers: pd.DataFrame) -> None:
-        self.consumer_table = customers  # Save customer table to return results for the query
+        self.costumer_table = customers  # Save customer table to return results for the query
 
         # Age
         self.age_encoder = \
-            sk_pre.KBinsDiscretizer(5, encode='onehot-dense', strategy='quantile',
+            sk_pre.KBinsDiscretizer(15, encode='onehot-dense', strategy='quantile',
                                     subsample=200000).fit(np.expand_dims(customers.age, 1))
         one_hot_age = self.age_encoder.transform(np.expand_dims(customers.age, 1))
 
@@ -120,18 +120,18 @@ class Shingling:
 
         # Transaction Time
         self.time_trans_encoder = \
-            sk_pre.KBinsDiscretizer(12, encode='onehot-dense', strategy='uniform',
+            sk_pre.KBinsDiscretizer(24, encode='onehot-dense', strategy='uniform',
                                     ).fit(np.expand_dims(customers.TransactionTime, 1))
         one_hot_time_trans = self.time_trans_encoder.transform(np.expand_dims(customers.TransactionTime, 1))
 
         # Transaction Amount
         self.trans_amount_encoder = \
-            sk_pre.KBinsDiscretizer(5, encode='onehot-dense', strategy='quantile', subsample=200000).fit(
+            sk_pre.KBinsDiscretizer(20, encode='onehot-dense', strategy='quantile', subsample=200000).fit(
                 np.expand_dims(customers['TransactionAmount (INR)'], 1))
         one_hot_amount = self.trans_amount_encoder.transform(np.expand_dims(customers['TransactionAmount (INR)'], 1))
 
         # Account balance
-        self.account_balance_encoder = sk_pre.KBinsDiscretizer(5, encode='onehot-dense', strategy='quantile',
+        self.account_balance_encoder = sk_pre.KBinsDiscretizer(20, encode='onehot-dense', strategy='quantile',
                                                                subsample=200000).fit(
             np.expand_dims(customers.CustAccountBalance, 1))
         one_hot_balance = self.account_balance_encoder.transform(np.expand_dims(customers.CustAccountBalance, 1))
@@ -203,19 +203,3 @@ class Shingling:
         customers.drop('CustomerDOB', axis=1, inplace=True)
 
         return cls(customers)
-
-
-# Test environ
-if __name__ == '__main__':
-    import sys
-    import os
-    import dotenv
-    import pickle
-
-    dotenv.load_dotenv('../../ext_variables.env')
-    get_trace = sys.gettrace()
-    file_path = os.path.join(os.getenv("PATH_FILES_ADM"), 'bank_transactions.csv')
-    trans_table = pd.read_csv(file_path, index_col='TransactionID', nrows=10000 if get_trace else 1048567)
-    shingling_obj = Shingling.constructor(trans_table)
-    with open(os.path.join(os.getenv("PATH_FILES_ADM"), 'shingling_obj.pickle'), 'wb') as file:
-        pickle.dump(shingling_obj, file)
