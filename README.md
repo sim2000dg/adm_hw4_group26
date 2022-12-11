@@ -1,8 +1,10 @@
 # adm_hw4_group26
 Repository for Homework 4 for Algorithmic Methods for Data Mining / Data Science@Sapienza
 
-Di Gregorio Simone \\
+Di Gregorio Simone 
+
 Di Nino Leonardo  
+
 Mandara Angelo
 
 The repository has the usual `main.ipynb` file with the main answers and the usual `CommandLine.sh` file with the answer to the command line question.
