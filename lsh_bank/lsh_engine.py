@@ -38,7 +38,7 @@ class Shuffling:
             yield permuted
 
 
-def min_hashing(shuffling_obj: Shuffling, shingle_matrix: sparse.csr_matrix) -> np.array:
+def min_hashing(shuffling_obj: Shuffling, shingle_matrix: sparse.csc_matrix) -> np.array:
     """
     This function takes care of the MinHashing, using other objects defined in this package.
     :param shuffling_obj: Object of type Shuffling, whose shuffle method is used to perform the repeated shuffling.

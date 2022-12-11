@@ -142,11 +142,11 @@ class Shingling:
             .fit(np.expand_dims(customers.CustLocation, 1))
         one_hot_location = self.location_encoder.transform(np.expand_dims(customers.CustLocation, 1))
 
-        self.shingle_matrix = sparse.csr_matrix(np.concatenate([one_hot_age, one_hot_gender,
+        self.shingle_matrix = sparse.csc_matrix(np.concatenate([one_hot_age, one_hot_gender,
                                                                 one_hot_time_trans, one_hot_amount, one_hot_balance,
                                                                 one_hot_location], axis=1).T)
 
-    def transform(self, customer_query: pd.DataFrame) -> sparse.csr_matrix:
+    def transform(self, customer_query: pd.DataFrame) -> sparse.csc_matrix:
         """
         Method to do the shingling transformation on query observations.
         :param customer_query: A Pandas DataFrame with the query observations
@@ -164,13 +164,13 @@ class Shingling:
         # Get age from DoB
         customer_query['age'] = get_age(customer_query.CustomerDOB)
 
-        shingle_matrix_query = sparse.csr_matrix(np.concatenate([
+        shingle_matrix_query = sparse.csc_matrix(np.concatenate([
             self.age_encoder.transform(np.expand_dims(customer_query.age, 1)),
             self.gender_encoder.transform(np.expand_dims(customer_query.CustGender, 1)),
             self.time_trans_encoder.transform(np.expand_dims(customer_query.TransactionTime, 1)),
             self.trans_amount_encoder.transform(np.expand_dims(customer_query['TransactionAmount (INR)'], 1)),
             self.account_balance_encoder.transform(np.expand_dims(customer_query.CustAccountBalance, 1)),
-            self.location_encoder.transform(np.expand_dims(customer_query.CustLocation, 1))], axis=1).T)
+            self.location_encoder.transform(np.expand_dims(customer_query.CustLocation, 1))], axis=1).T, dtype=np.int8)
         return shingle_matrix_query
 
     @classmethod
